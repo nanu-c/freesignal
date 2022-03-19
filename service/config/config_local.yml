@@ -383,7 +383,4 @@ boost:
 
 testDevices:
   - number: "+120255551212"
-    name: "Test Device 1"
-    type: "ios"
-    uuid: "717b1c09-ed0b-4120-bb0e-f4697534b8e1"
     code: "12345"

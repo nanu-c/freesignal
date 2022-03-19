@@ -381,5 +381,4 @@ boost:
 
 testDevices:
   - number: "+436706070770"
-    name: "Test Device 1"
     code: "12345"

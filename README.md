@@ -2,7 +2,7 @@
 
 
 ## Installation
-* Needs git and docker
+* Needs git, docker, docker-compose
 * Checkout the submodules `git submodule update --init && git submodule update`
 * Apply patch to the source code `cd Signal-Sever && git apply ../patches/patch1`
 ** The patch disables recapctha, APN and replaces the depency of amazon IAM to a local server version
@@ -14,18 +14,19 @@
 
 
 ### Setup the abuse database
-* `docker-compose up -d postgres-abuse`
+* `docker-compose up -d postgresql-abuse`
 * `docker-compose exec -u postgres postgresql-abuse psql -c 'create database abusedb;'`
 * `java -jar ./Signal-Server/service/target/TextSecureServer-7.37.1-dirty-SNAPSHOT.jar abusedb migrate ./service/config/config_local.yml`
 
 ### Setup dynamodb
 * `docker-compose up -d dynamodb`
+* `apt install unzip`
 * install aws-cli -> https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
 * `aws configure`
 ** aws_access_key_id:accessKey
 ** aws_secret_access_key: secretKey
 ** region: eu-west-2
-run `dynamodb_init.sh`
+run `sh ./dynamodb_init.sh`
 
 ## Configure
 
@@ -49,6 +50,7 @@ openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in keypair.pem -out pkcs
 ## developmet
 
 java 1.17 openjdk + maven 3.8.4
+`apt install apt install openjdk-17-jdk`
 
 `source apache-maven.sh`
 

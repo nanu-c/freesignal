@@ -1,0 +1,445 @@
+diff --git a/service/src/main/java/org/whispersystems/textsecuregcm/WhisperServerService.java b/service/src/main/java/org/whispersystems/textsecuregcm/WhisperServerService.java
+index ac27c85f..259001c0 100644
+--- a/service/src/main/java/org/whispersystems/textsecuregcm/WhisperServerService.java
++++ b/service/src/main/java/org/whispersystems/textsecuregcm/WhisperServerService.java
+@@ -340,6 +340,7 @@ public class WhisperServerService extends Application<WhisperServerConfiguration
+         new DynamicConfigurationManager<>(config.getAppConfig().getApplication(),
+             config.getAppConfig().getEnvironment(),
+             config.getAppConfig().getConfigurationName(),
++            config.getAppConfig().getUrl(),
+             DynamicConfiguration.class);
+ 
+     Accounts accounts = new Accounts(dynamoDbClient,
+diff --git a/service/src/main/java/org/whispersystems/textsecuregcm/configuration/AppConfigConfiguration.java b/service/src/main/java/org/whispersystems/textsecuregcm/configuration/AppConfigConfiguration.java
+index 1f4d08c0..c069636c 100644
+--- a/service/src/main/java/org/whispersystems/textsecuregcm/configuration/AppConfigConfiguration.java
++++ b/service/src/main/java/org/whispersystems/textsecuregcm/configuration/AppConfigConfiguration.java
+@@ -18,6 +18,10 @@ public class AppConfigConfiguration {
+   @NotEmpty
+   private String configuration;
+ 
++  @JsonProperty("url")
++  private String url;
++
++
+   public String getApplication() {
+     return application;
+   }
+@@ -29,4 +33,9 @@ public class AppConfigConfiguration {
+   public String getConfigurationName() {
+     return configuration;
+   }
++
++  public String getUrl() {
++    return url;
++  }
++
+ }
+diff --git a/service/src/main/java/org/whispersystems/textsecuregcm/configuration/DynamoDbClientConfiguration.java b/service/src/main/java/org/whispersystems/textsecuregcm/configuration/DynamoDbClientConfiguration.java
+index 3a7c84a7..c4b6157b 100644
+--- a/service/src/main/java/org/whispersystems/textsecuregcm/configuration/DynamoDbClientConfiguration.java
++++ b/service/src/main/java/org/whispersystems/textsecuregcm/configuration/DynamoDbClientConfiguration.java
+@@ -13,15 +13,18 @@ import javax.validation.constraints.NotEmpty;
+ public class DynamoDbClientConfiguration {
+ 
+   private final String region;
++  private final String endpoint;
+   private final Duration clientExecutionTimeout;
+   private final Duration clientRequestTimeout;
+ 
+   @JsonCreator
+   public DynamoDbClientConfiguration(
++      @JsonProperty("endpoint") final String endpoint,
+       @JsonProperty("region") final String region,
+       @JsonProperty("clientExcecutionTimeout") final Duration clientExecutionTimeout,
+       @JsonProperty("clientRequestTimeout") final Duration clientRequestTimeout) {
+     this.region = region;
++    this.endpoint = endpoint;
+     this.clientExecutionTimeout = clientExecutionTimeout != null ? clientExecutionTimeout : Duration.ofSeconds(30);
+     this.clientRequestTimeout = clientRequestTimeout != null ? clientRequestTimeout : Duration.ofSeconds(10);
+   }
+@@ -31,6 +34,10 @@ public class DynamoDbClientConfiguration {
+     return region;
+   }
+ 
++  public String getEndpoint() {
++    return endpoint;
++  }
++
+   public Duration getClientExecutionTimeout() {
+     return clientExecutionTimeout;
+   }
+diff --git a/service/src/main/java/org/whispersystems/textsecuregcm/push/ApnFallbackManager.java b/service/src/main/java/org/whispersystems/textsecuregcm/push/ApnFallbackManager.java
+index 55ba4065..f7c6c4a6 100644
+--- a/service/src/main/java/org/whispersystems/textsecuregcm/push/ApnFallbackManager.java
++++ b/service/src/main/java/org/whispersystems/textsecuregcm/push/ApnFallbackManager.java
+@@ -73,8 +73,8 @@ public class ApnFallbackManager implements Managed {
+     public void run() {
+       while (running.get()) {
+         try {
+-          final long entriesProcessed = processNextSlot();
+-
++          //final long entriesProcessed = processNextSlot();
++          final long entriesProcessed = 0;
+           if (entriesProcessed == 0) {
+             Util.sleep(1000);
+           }
+diff --git a/service/src/main/java/org/whispersystems/textsecuregcm/push/RetryingApnsClient.java b/service/src/main/java/org/whispersystems/textsecuregcm/push/RetryingApnsClient.java
+index 119d9c1d..a9f57985 100644
+--- a/service/src/main/java/org/whispersystems/textsecuregcm/push/RetryingApnsClient.java
++++ b/service/src/main/java/org/whispersystems/textsecuregcm/push/RetryingApnsClient.java
+@@ -9,28 +9,23 @@ import com.codahale.metrics.Metric;
+ import com.codahale.metrics.MetricRegistry;
+ import com.codahale.metrics.SharedMetricRegistries;
+ import com.eatthepath.pushy.apns.ApnsClient;
+-import com.eatthepath.pushy.apns.ApnsClientBuilder;
+-import com.eatthepath.pushy.apns.DeliveryPriority;
+ import com.eatthepath.pushy.apns.PushNotificationResponse;
+-import com.eatthepath.pushy.apns.PushType;
+-import com.eatthepath.pushy.apns.auth.ApnsSigningKey;
+ import com.eatthepath.pushy.apns.metrics.dropwizard.DropwizardApnsClientMetricsListener;
+ import com.eatthepath.pushy.apns.util.SimpleApnsPushNotification;
+ import com.google.common.annotations.VisibleForTesting;
+ import com.google.common.util.concurrent.ListenableFuture;
+ import com.google.common.util.concurrent.SettableFuture;
+ import io.micrometer.core.instrument.Metrics;
+-import org.slf4j.Logger;
+-import org.slf4j.LoggerFactory;
+-import org.whispersystems.textsecuregcm.util.Constants;
+-
+-import java.io.ByteArrayInputStream;
+ import java.io.IOException;
+ import java.security.InvalidKeyException;
+ import java.security.NoSuchAlgorithmException;
+ import java.time.Instant;
+ import java.util.Map;
+ import java.util.function.BiConsumer;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++import org.whispersystems.textsecuregcm.util.Constants;
++
+ 
+ import static com.codahale.metrics.MetricRegistry.name;
+ 
+@@ -54,30 +49,30 @@ public class RetryingApnsClient {
+     for (Map.Entry<String, Metric> entry : metricsListener.getMetrics().entrySet()) {
+       metricRegistry.register(name(getClass(), entry.getKey()), entry.getValue());
+     }
+-
+-    this.apnsClient = new ApnsClientBuilder().setSigningKey(ApnsSigningKey.loadFromInputStream(new ByteArrayInputStream(apnSigningKey.getBytes()), teamId, keyId))
+-                                             .setMetricsListener(metricsListener)
+-                                             .setTrustedServerCertificateChain(getClass().getResourceAsStream(APNS_CA_FILENAME))
+-                                             .setApnsServer(sandbox ? ApnsClientBuilder.DEVELOPMENT_APNS_HOST : ApnsClientBuilder.PRODUCTION_APNS_HOST)
+-                                             .build();
++    this.apnsClient = null;
++    // this.apnsClient = new ApnsClientBuilder().setSigningKey(ApnsSigningKey.loadFromInputStream(new ByteArrayInputStream(apnSigningKey.getBytes()), teamId, keyId))
++    //                                          .setMetricsListener(metricsListener)
++    //                                          .setTrustedServerCertificateChain(getClass().getResourceAsStream(APNS_CA_FILENAME))
++    //                                          .setApnsServer(sandbox ? ApnsClientBuilder.DEVELOPMENT_APNS_HOST : ApnsClientBuilder.PRODUCTION_APNS_HOST)
++    //                                          .build();
+   }
+ 
+   @VisibleForTesting
+   public RetryingApnsClient(ApnsClient apnsClient) {
+-    this.apnsClient = apnsClient;
++    this.apnsClient = null;
+   }
+ 
+   ListenableFuture<ApnResult> send(final String apnId, final String topic, final String payload, final Instant expiration, final boolean isVoip, final String collapseId) {
+     SettableFuture<ApnResult>  result       = SettableFuture.create();
+-    SimpleApnsPushNotification notification = new SimpleApnsPushNotification(apnId, topic, payload, expiration, DeliveryPriority.IMMEDIATE, isVoip ? PushType.VOIP : PushType.ALERT, collapseId);
++    // SimpleApnsPushNotification notification = new SimpleApnsPushNotification(apnId, topic, payload, expiration, DeliveryPriority.IMMEDIATE, isVoip ? PushType.VOIP : PushType.ALERT, collapseId);
+         
+-    apnsClient.sendNotification(notification).whenComplete(new ResponseHandler(result));
++    //apnsClient.sendNotification(notification).whenComplete(new ResponseHandler(result));
+ 
+     return result;
+   }
+ 
+   void disconnect() {
+-    apnsClient.close();
++//    apnsClient.close();
+   }
+ 
+   private static final class ResponseHandler implements BiConsumer<PushNotificationResponse<SimpleApnsPushNotification>, Throwable> {
+diff --git a/service/src/main/java/org/whispersystems/textsecuregcm/recaptcha/EnterpriseRecaptchaClient.java b/service/src/main/java/org/whispersystems/textsecuregcm/recaptcha/EnterpriseRecaptchaClient.java
+index 674d31eb..ae03a91e 100644
+--- a/service/src/main/java/org/whispersystems/textsecuregcm/recaptcha/EnterpriseRecaptchaClient.java
++++ b/service/src/main/java/org/whispersystems/textsecuregcm/recaptcha/EnterpriseRecaptchaClient.java
+@@ -40,17 +40,22 @@ public class EnterpriseRecaptchaClient implements RecaptchaClient {
+       @Nonnull final String projectPath,
+       @Nonnull final String recaptchaCredentialConfigurationJson,
+       final DynamicConfigurationManager<DynamicConfiguration> dynamicConfigurationManager) {
+-    try {
+-      this.projectPath = Objects.requireNonNull(projectPath);
+-      this.client = RecaptchaEnterpriseServiceClient.create(RecaptchaEnterpriseServiceSettings.newBuilder()
+-          .setCredentialsProvider(FixedCredentialsProvider.create(GoogleCredentials.fromStream(
+-              new ByteArrayInputStream(recaptchaCredentialConfigurationJson.getBytes(StandardCharsets.UTF_8)))))
+-          .build());
+-
+       this.dynamicConfigurationManager = dynamicConfigurationManager;
+-    } catch (IOException e) {
+-      throw new AssertionError(e);
+-    }
++      this.projectPath = Objects.requireNonNull(projectPath);
++      this.client = null;
++
++
++//    try {
++//      this.projectPath = Objects.requireNonNull(projectPath);
++////      this.client = RecaptchaEnterpriseServiceClient.create(RecaptchaEnterpriseServiceSettings.newBuilder()
++////          .setCredentialsProvider(FixedCredentialsProvider.create(GoogleCredentials.fromStream(
++////              new ByteArrayInputStream(recaptchaCredentialConfigurationJson.getBytes(StandardCharsets.UTF_8)))))
++////          .build());
++//      this.dynamicConfigurationManager = dynamicConfigurationManager;
++//
++//    } catch (IOException e) {
++//      throw new AssertionError(e);
++//    }
+   }
+ 
+   /**
+diff --git a/service/src/main/java/org/whispersystems/textsecuregcm/storage/DynamicConfigurationManager.java b/service/src/main/java/org/whispersystems/textsecuregcm/storage/DynamicConfigurationManager.java
+index 74775b6f..647e9bc5 100644
+--- a/service/src/main/java/org/whispersystems/textsecuregcm/storage/DynamicConfigurationManager.java
++++ b/service/src/main/java/org/whispersystems/textsecuregcm/storage/DynamicConfigurationManager.java
+@@ -6,33 +6,31 @@ import com.fasterxml.jackson.databind.ObjectMapper;
+ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+ import com.google.common.annotations.VisibleForTesting;
+-import java.time.Duration;
+-import java.util.Objects;
++import io.micrometer.core.instrument.Metrics;
++import java.io.BufferedReader;
++import java.io.InputStreamReader;
++import java.net.URL;
+ import java.util.Optional;
+ import java.util.Set;
+-import java.util.UUID;
+-import java.util.concurrent.CountDownLatch;
+ import java.util.concurrent.atomic.AtomicReference;
+ import javax.validation.ConstraintViolation;
+ import javax.validation.Validation;
+ import javax.validation.Validator;
+-import io.micrometer.core.instrument.Metrics;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ import org.whispersystems.textsecuregcm.util.Util;
+-import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
+ import software.amazon.awssdk.services.appconfigdata.AppConfigDataClient;
+-import software.amazon.awssdk.services.appconfigdata.model.GetLatestConfigurationRequest;
+-import software.amazon.awssdk.services.appconfigdata.model.GetLatestConfigurationResponse;
+ import software.amazon.awssdk.services.appconfigdata.model.StartConfigurationSessionRequest;
+ import software.amazon.awssdk.services.appconfigdata.model.StartConfigurationSessionResponse;
+ 
++
+ import static org.whispersystems.textsecuregcm.metrics.MetricsUtil.name;
+ 
+ public class DynamicConfigurationManager<T> {
+ 
+   private final String application;
+   private final String environment;
++  private final String url;
+   private final String configurationName;
+   private final AppConfigDataClient appConfigClient;
+   private final Class<T> configurationClass;
+@@ -55,23 +53,25 @@ public class DynamicConfigurationManager<T> {
+ 
+   private static final Logger logger = LoggerFactory.getLogger(DynamicConfigurationManager.class);
+ 
+-  public DynamicConfigurationManager(String application, String environment, String configurationName,
++  public DynamicConfigurationManager(String application, String environment, String configurationName, String url,
+       Class<T> configurationClass) {
+-    this(AppConfigDataClient
+-            .builder()
+-            .overrideConfiguration(ClientOverrideConfiguration.builder()
+-                .apiCallTimeout(Duration.ofSeconds(10))
+-                .apiCallAttemptTimeout(Duration.ofSeconds(10)).build())
+-            .build(),
+-        application, environment, configurationName, configurationClass);
++    this(null,
++//        AppConfigDataClient
++//            .builder()
++//            .overrideConfiguration(ClientOverrideConfiguration.builder()
++//                .apiCallTimeout(Duration.ofSeconds(10))
++//                .apiCallAttemptTimeout(Duration.ofSeconds(10)).build())
++//            .build(),
++        application, environment, configurationName, url, configurationClass);
+   }
+ 
+   @VisibleForTesting
+   DynamicConfigurationManager(AppConfigDataClient appConfigClient, String application, String environment,
+-      String configurationName, Class<T> configurationClass) {
++      String configurationName, String url, Class<T> configurationClass) {
+     this.appConfigClient = appConfigClient;
+     this.application = application;
+     this.environment = environment;
++    this.url = url;
+     this.configurationName = configurationName;
+     this.configurationClass = configurationClass;
+   }
+@@ -86,7 +86,7 @@ public class DynamicConfigurationManager<T> {
+   }
+ 
+   public void start() {
+-    configuration.set(retrieveInitialDynamicConfiguration());
++    //configuration.set(retrieveInitialDynamicConfiguration());
+     synchronized (this) {
+       this.initialized = true;
+       this.notifyAll();
+@@ -112,35 +112,27 @@ public class DynamicConfigurationManager<T> {
+     if (configurationToken == null) {
+         logger.error("Invalid configuration token, will not be able to fetch configuration updates");
+     }
+-    GetLatestConfigurationResponse latestConfiguration;
+-    try {
+-      latestConfiguration = appConfigClient.getLatestConfiguration(GetLatestConfigurationRequest.builder()
+-          .configurationToken(configurationToken)
+-          .build());
+-      // token to use in the next fetch
+-      configurationToken = latestConfiguration.nextPollConfigurationToken();
+-      logger.debug("next token: {}", configurationToken);
+-    } catch (final RuntimeException e) {
+-      Metrics.counter(ERROR_COUNTER_NAME, ERROR_TYPE_TAG_NAME, "fetch").increment();
+-      throw e;
+-    }
+-
+-    if (!latestConfiguration.configuration().asByteBuffer().hasRemaining()) {
+-      // empty configuration means nothing has changed
+-      return Optional.empty();
+-    }
+-    logger.info("Received new config of length {}, next configuration token: {}",
+-        latestConfiguration.configuration().asByteBuffer().remaining(),
+-        configurationToken);
+-
+-    try {
+-      return parseConfiguration(latestConfiguration.configuration().asUtf8String(), configurationClass);
+-    } catch (final JsonProcessingException e) {
+-      Metrics.counter(ERROR_COUNTER_NAME,
+-          ERROR_TYPE_TAG_NAME, "parse",
+-          CONFIG_CLASS_TAG_NAME, configurationClass.getName()).increment();
+-      throw e;
++    String configURL = this.url+configurationName+"/config.yml";
++    logger.info(configURL);
++    String config ="";
++    try{
++      URL url = new URL(configURL);
++      String line;
++      BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
++      while ((line = in.readLine()) != null) {
++        config += line +"\n";
++      }
++    } catch (Exception e){
++      System.out.println("Something went wrong.");
+     }
++   try {
++     return parseConfiguration(config, configurationClass);
++   } catch (final JsonProcessingException e) {
++     Metrics.counter(ERROR_COUNTER_NAME,
++         ERROR_TYPE_TAG_NAME, "parse",
++         CONFIG_CLASS_TAG_NAME, configurationClass.getName()).increment();
++     throw e;
++   }
+   }
+ 
+   @VisibleForTesting
+@@ -181,3 +173,4 @@ public class DynamicConfigurationManager<T> {
+     }
+   }
+ }
++
+diff --git a/service/src/main/java/org/whispersystems/textsecuregcm/util/DynamoDbFromConfig.java b/service/src/main/java/org/whispersystems/textsecuregcm/util/DynamoDbFromConfig.java
+index 559baf3d..3e8d5dd5 100644
+--- a/service/src/main/java/org/whispersystems/textsecuregcm/util/DynamoDbFromConfig.java
++++ b/service/src/main/java/org/whispersystems/textsecuregcm/util/DynamoDbFromConfig.java
+@@ -1,7 +1,10 @@
+ package org.whispersystems.textsecuregcm.util;
+ 
++import java.net.URI;
+ import org.whispersystems.textsecuregcm.configuration.DynamoDbClientConfiguration;
++import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
++import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+ import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
+ import software.amazon.awssdk.regions.Region;
+ import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
+@@ -10,9 +13,13 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+ public class DynamoDbFromConfig {
+ 
+   public static DynamoDbClient client(DynamoDbClientConfiguration config, AwsCredentialsProvider credentialsProvider) {
++    System.out.print(config.getRegion());
+     return DynamoDbClient.builder()
++        .endpointOverride(URI.create(config.getEndpoint()))
+         .region(Region.of(config.getRegion()))
+-        .credentialsProvider(credentialsProvider)
++        // .credentialsProvider(credentialsProvider)
++        .credentialsProvider(StaticCredentialsProvider.create(
++          AwsBasicCredentials.create("accessKey", "secretKey")))
+         .overrideConfiguration(ClientOverrideConfiguration.builder()
+             .apiCallTimeout(config.getClientExecutionTimeout())
+             .apiCallAttemptTimeout(config.getClientRequestTimeout())
+@@ -24,8 +31,10 @@ public class DynamoDbFromConfig {
+       DynamoDbClientConfiguration config,
+       AwsCredentialsProvider credentialsProvider) {
+     return DynamoDbAsyncClient.builder()
++        .endpointOverride(URI.create(config.getEndpoint()))
+         .region(Region.of(config.getRegion()))
+-        .credentialsProvider(credentialsProvider)
++        .credentialsProvider(StaticCredentialsProvider.create(
++          AwsBasicCredentials.create("accessKey", "secretKey")))
+         .overrideConfiguration(ClientOverrideConfiguration.builder()
+             .apiCallTimeout(config.getClientExecutionTimeout())
+             .apiCallAttemptTimeout(config.getClientRequestTimeout())
+diff --git a/service/src/main/java/org/whispersystems/textsecuregcm/workers/AssignUsernameCommand.java b/service/src/main/java/org/whispersystems/textsecuregcm/workers/AssignUsernameCommand.java
+index 8add5ffd..8bf75e09 100644
+--- a/service/src/main/java/org/whispersystems/textsecuregcm/workers/AssignUsernameCommand.java
++++ b/service/src/main/java/org/whispersystems/textsecuregcm/workers/AssignUsernameCommand.java
+@@ -107,7 +107,7 @@ public class AssignUsernameCommand extends EnvironmentCommand<WhisperServerConfi
+ 
+     DynamicConfigurationManager<DynamicConfiguration> dynamicConfigurationManager = new DynamicConfigurationManager<>(
+         configuration.getAppConfig().getApplication(), configuration.getAppConfig().getEnvironment(),
+-        configuration.getAppConfig().getConfigurationName(), DynamicConfiguration.class);
++        configuration.getAppConfig().getConfigurationName(),configuration.getAppConfig().getUrl(), DynamicConfiguration.class);
+     dynamicConfigurationManager.start();
+ 
+     DynamoDbAsyncClient dynamoDbAsyncClient = DynamoDbFromConfig.asyncClient(
+diff --git a/service/src/main/java/org/whispersystems/textsecuregcm/workers/DeleteUserCommand.java b/service/src/main/java/org/whispersystems/textsecuregcm/workers/DeleteUserCommand.java
+index f9e28aa5..e9048067 100644
+--- a/service/src/main/java/org/whispersystems/textsecuregcm/workers/DeleteUserCommand.java
++++ b/service/src/main/java/org/whispersystems/textsecuregcm/workers/DeleteUserCommand.java
+@@ -110,7 +110,8 @@ public class DeleteUserCommand extends EnvironmentCommand<WhisperServerConfigura
+ 
+       DynamicConfigurationManager<DynamicConfiguration> dynamicConfigurationManager = new DynamicConfigurationManager<>(
+           configuration.getAppConfig().getApplication(), configuration.getAppConfig().getEnvironment(),
+-          configuration.getAppConfig().getConfigurationName(), DynamicConfiguration.class);
++          configuration.getAppConfig().getConfigurationName(), configuration.getAppConfig().getUrl(),
++          DynamicConfiguration.class);
+       dynamicConfigurationManager.start();
+ 
+       DynamoDbAsyncClient dynamoDbAsyncClient = DynamoDbFromConfig.asyncClient(
+diff --git a/service/src/main/java/org/whispersystems/textsecuregcm/workers/SetUserDiscoverabilityCommand.java b/service/src/main/java/org/whispersystems/textsecuregcm/workers/SetUserDiscoverabilityCommand.java
+index bebd7ec3..de74cfd5 100644
+--- a/service/src/main/java/org/whispersystems/textsecuregcm/workers/SetUserDiscoverabilityCommand.java
++++ b/service/src/main/java/org/whispersystems/textsecuregcm/workers/SetUserDiscoverabilityCommand.java
+@@ -113,7 +113,7 @@ public class SetUserDiscoverabilityCommand extends EnvironmentCommand<WhisperSer
+ 
+       DynamicConfigurationManager<DynamicConfiguration> dynamicConfigurationManager = new DynamicConfigurationManager<>(
+           configuration.getAppConfig().getApplication(), configuration.getAppConfig().getEnvironment(),
+-          configuration.getAppConfig().getConfigurationName(), DynamicConfiguration.class);
++          configuration.getAppConfig().getConfigurationName(),configuration.getAppConfig().getUrl(), DynamicConfiguration.class);
+       dynamicConfigurationManager.start();
+ 
+       DynamoDbAsyncClient dynamoDbAsyncClient = DynamoDbFromConfig.asyncClient(
+diff --git a/service/src/test/java/org/whispersystems/textsecuregcm/storage/DynamicConfigurationManagerTest.java b/service/src/test/java/org/whispersystems/textsecuregcm/storage/DynamicConfigurationManagerTest.java
+index 9ddf6c0d..64bc80b1 100644
+--- a/service/src/test/java/org/whispersystems/textsecuregcm/storage/DynamicConfigurationManagerTest.java
++++ b/service/src/test/java/org/whispersystems/textsecuregcm/storage/DynamicConfigurationManagerTest.java
+@@ -32,7 +32,7 @@ class DynamicConfigurationManagerTest {
+   void setup() {
+     this.appConfig = mock(AppConfigDataClient.class);
+     this.dynamicConfigurationManager = new DynamicConfigurationManager<>(
+-        appConfig, "foo", "bar", "baz", DynamicConfiguration.class);
++        appConfig, "foo", "bar", "baz", "taz", DynamicConfiguration.class);
+     this.startConfigurationSession = StartConfigurationSessionRequest.builder()
+         .applicationIdentifier("foo")
+         .environmentIdentifier("bar")

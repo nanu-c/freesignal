@@ -1,0 +1,76 @@
+experiments:
+  enrolledUuids:
+  enrollmentPercentage:
+preRegistrationExperiments:
+  percentageOnly:
+    enrollmentPercentage: 17
+  e164sCountryCodesAndPercentage:
+    enrolledE164s:
+      - +120255551212
+      - +3655323174
+    excludedE164s:
+      - +120255551213
+      - +3655323175
+    enrollmentPercentage: 46
+    excludedCountryCodes:
+      - 47
+    includedCountryCodes:
+      - 56
+  e164sAndExcludedCodes:
+    enrolledE164s:
+      - +120255551212
+    excludedCountryCodes:
+      - 47
+  percentageOnly:
+    enrollmentPercentage: 12
+  uuidsAndPercentage:
+    enrolledUuids:
+      - 717b1c09-ed0b-4120-bb0e-f4697534b8e1
+      - 279f264c-56d7-4bbf-b9da-de718ff90903
+    enrollmentPercentage: 77
+  uuidsOnly:
+    enrolledUuids:
+      - 71618739-114c-4b1f-bb0d-6478a44eb600
+limits:
+  rateLimitReset:
+    bucketSize: 17
+    leakRatePerMinute: 44
+  recaptchaChallengeAttempt:
+    bucketSize: 17
+    leakRatePerMinute: 44
+  recaptchaChallengeSuccess:
+    bucketSize: 17
+    leakRatePerMinute: 44
+  pushChallengeAttempt:
+    bucketSize: 17
+    leakRatePerMinute: 44
+  pushChallengeSuccess:
+    bucketSize: 17
+    leakRatePerMinute: 44
+remoteDeprecation:
+  minimumVersions:
+    IOS: 1.2.3
+    ANDROID: 4.5.6
+  versionsPendingDeprecation:
+    DESKTOP: 7.8.9
+  blockedVersions:
+    DESKTOP:
+      - 1.4.0-beta.2
+payments:
+  disallowedPrefixes:
+    - +44
+featureFlags:
+  - DISABLE_MESSAGE_PERSISTER
+twilio:
+captcha:
+  signupCountryCodes:
+    - 1
+  scoreFloor: 0.9
+rateLimitChallenge:
+  clientSupportedVersions:
+    IOS: 5.1.0
+    ANDROID: 5.2.0
+    DESKTOP: 5.0.0
+directoryReconciler:
+  enabled: false
+pushLatency:

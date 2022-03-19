@@ -1,0 +1,141 @@
+version: '2'
+services:
+  signal-server:
+    build: .
+    container_name: signal_server
+    restart: always
+    environment:
+     - DEFAULT_REGION=eu-west-2
+    ports:
+      - "8070:8080"
+      - "8071:8081"
+    links:
+      - "dynamodb:dynamodb"
+      - "config-server:config-server"
+      - "postgresql-abuse:postgresql-abuse"
+      - "redis-node-1:redis-node-1"
+      - "redis-node-2:redis-node-2"
+      - "redis-node-3:redis-node-3"
+      - "redis-node-4:redis-node-4"
+      - "redis-node-5:redis-node-5"
+      - "redis-node-0:redis-node-0"
+    volumes: 
+      - ./service/config/:/Signal-Server/service/config/
+  redis-node-0:
+    image: docker.io/bitnami/redis-cluster:6.2
+    volumes:
+      - redis-cluster_data-0:/bitnami/redis/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+
+  redis-node-1:
+    image: docker.io/bitnami/redis-cluster:6.2
+    volumes:
+      - redis-cluster_data-1:/bitnami/redis/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+
+  redis-node-2:
+    image: docker.io/bitnami/redis-cluster:6.2
+    volumes:
+      - redis-cluster_data-2:/bitnami/redis/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+
+  redis-node-3:
+    image: docker.io/bitnami/redis-cluster:6.2
+    volumes:
+      - redis-cluster_data-3:/bitnami/redis/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+
+  redis-node-4:
+    image: docker.io/bitnami/redis-cluster:6.2
+    volumes:
+      - redis-cluster_data-4:/bitnami/redis/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+
+  redis-node-5:
+    image: docker.io/bitnami/redis-cluster:6.2
+    volumes:
+      - redis-cluster_data-5:/bitnami/redis/data
+    depends_on:
+      - redis-node-0
+      - redis-node-1
+      - redis-node-2
+      - redis-node-3
+      - redis-node-4
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - 'REDISCLI_AUTH=bitnami'
+      - 'REDIS_CLUSTER_REPLICAS=1'
+      - 'REDIS_NODES=redis-node-0 redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5'
+      - 'REDIS_CLUSTER_CREATOR=yes'
+  sqs:
+    image: roribio16/alpine-sqs:1.2.0
+    container_name: sqs
+    ports:
+      - '9324:9324'
+      - '9325:9325'
+  postgresql-abuse:
+    image: postgres
+    container_name: signal_postgres_abuse
+    restart: always
+    ports:
+      - "8001:5432"
+    volumes:
+      - ./postgresql/abusedb/:/var/lib/postgresql/
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=signal_db
+      - PGDATA=/var/lib/postgresql/data/pgdata
+  dynamodb:
+    image: amazon/dynamodb-local
+    container_name: signal_dynamodb
+    restart: always
+    ports:
+      - "8002:8000"
+  localstack-s3:
+    image: localstack/localstack:latest
+    container_name: signal_s3
+    environment:
+     - SERVICES=s3:5002
+     - DEFAULT_REGION=eu-west-2
+     - DATA_DIR=/tmp/localstack/data
+    ports:
+     - "8004:5002"
+     - "9999:8080"
+    volumes:
+      - localstack-data:/tmp/localstack
+  config-server:
+    image: httpd:2.4
+    container_name: config_server
+    ports:
+      - "8003:80"
+    volumes:
+      - ./service/config-server:/usr/local/apache2/htdocs/
+    restart: always
+volumes:
+  localstack-data:
+    driver: local
+  redis-node-1-data:
+    driver: local
+  redis-cluster_data-0:
+    driver: local
+  redis-cluster_data-1:
+    driver: local
+  redis-cluster_data-2:
+    driver: local
+  redis-cluster_data-3:
+    driver: local
+  redis-cluster_data-4:
+    driver: local
+  redis-cluster_data-5:
+    driver: local

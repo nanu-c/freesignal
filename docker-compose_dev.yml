@@ -1,0 +1,73 @@
+version: '2'
+services:
+  redis-cluster:
+    image: grokzen/redis-cluster:latest
+    container_name: redis_cluster
+    environment:
+     IP: 0.0.0.0
+    hostname: server
+    ports:
+      - '7000-7005:7000-7005'
+      - '5000-5010:5000-5010'
+  sqs:
+    image: roribio16/alpine-sqs:1.2.0
+    container_name: sqs
+    ports:
+      - '9324:9324'
+      - '9325:9325'
+  postgresql-abuse:
+    image: postgres
+    container_name: signal_postgres_abuse
+    restart: always
+    ports:
+      - "8001:5432"
+    volumes:
+      - ./postgresql/abusedb/:/var/lib/postgresql/
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=signal_db
+      - PGDATA=/var/lib/postgresql/data/pgdata
+  dynamodb:
+    image: wernerwws/dynamodb-local-with-logging
+    container_name: signal_dynamodb
+    restart: always
+    ports:
+      - "8002:8000"
+  localstack-s3:
+    image: localstack/localstack:latest
+    container_name: signal_s3
+    environment:
+     - SERVICES=s3:5002
+     - DEFAULT_REGION=eu-west-2
+     - DATA_DIR=/tmp/localstack/data
+    ports:
+     - "8004:5002"
+     - "9999:8080"
+    volumes:
+      - localstack-data:/tmp/localstack
+  config-server:
+    image: httpd:2.4
+    container_name: config_server
+    ports:
+      - "8003:80"
+    volumes:
+      - ./service/config-server:/usr/local/apache2/htdocs/
+    restart: always
+volumes:
+  localstack-data:
+    driver: local
+  redis-node-1-data:
+    driver: local
+  redis-cluster_data-0:
+    driver: local
+  redis-cluster_data-1:
+    driver: local
+  redis-cluster_data-2:
+    driver: local
+  redis-cluster_data-3:
+    driver: local
+  redis-cluster_data-4:
+    driver: local
+  redis-cluster_data-5:
+    driver: local

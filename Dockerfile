@@ -18,11 +18,11 @@ RUN ["/bin/bash", "-c", "source ~/.bashrc"]
 RUN update-ca-certificates -f
 RUN apt-get install --reinstall ca-certificates-java
 
-# --> Install maven 3.8.4 <--
+# --> Install maven 3.8.5 <--
 RUN apt-get install maven -y
-RUN cd /usr/local && wget https://downloads.apache.org/maven/maven-3/3.8.4/binaries/apache-maven-3.8.4-bin.tar.gz
-RUN cd /usr/local && tar xzf apache-maven-3.8.4-bin.tar.gz \ 
-    && ln -s apache-maven-3.8.4 apache-maven
+RUN cd /usr/local && wget https://downloads.apache.org/maven/maven-3/3.8.5/binaries/apache-maven-3.8.5-bin.tar.gz
+RUN cd /usr/local && tar xzf apache-maven-3.8.5-bin.tar.gz \ 
+    && ln -s apache-maven-3.8.5 apache-maven
 RUN echo "export JAVA_HOME=/usr/lib/jvm/java-1.17.0-openjdk-amd64" >> /etc/profile.d/apache-maven.sh
 RUN echo "export M2_HOME=/usr/local/apache-maven" >> /etc/profile.d/apache-maven.sh
 RUN echo "export MAVEN_HOME=/usr/local/apache-maven" >> /etc/profile.d/apache-maven.sh

@@ -1,4 +1,4 @@
-# Sweet lies signal server
+# amazon free signal server
 
 
 ## Installation
